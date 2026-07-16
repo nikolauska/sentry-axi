@@ -17,7 +17,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm pack --dry-run
+      - run: |
+          mkdir -p /tmp/sentry-axi-smoke
+          npm pack --pack-destination /tmp/sentry-axi-smoke
+          npm install --prefix /tmp/sentry-axi-smoke /tmp/sentry-axi-smoke/*.tgz
+          /tmp/sentry-axi-smoke/node_modules/.bin/sentry-axi --help
 
   release:
     if: github.ref_type == 'tag'

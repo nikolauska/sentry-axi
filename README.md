@@ -87,11 +87,12 @@ npm ci
 npm run format       # Oxfmt
 npm run lint         # Oxlint
 npm run typecheck
+npm run build         # Emit publishable JavaScript to dist/
 npm test
 npm run check
 ```
 
-Source runs directly as TypeScript using Node 24's type stripping; there is no build artifact. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`.
+Development source runs directly as TypeScript. `npm run build` emits the JavaScript published from `dist/`. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`.
 
 ## License
 

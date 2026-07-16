@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { main } from "../src/cli.ts";
+import { main } from "./cli.ts";
 
 main(process.argv.slice(2), {
   cwd: process.cwd(),

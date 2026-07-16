@@ -4,11 +4,11 @@ This is an agent-oriented TypeScript CLI wrapping the remote Sentry MCP server.
 
 ## Stack and commands
 
-- Node.js 24+ runs TypeScript source directly; do not add a transpiled build artifact.
+- Node.js 24+ runs TypeScript source directly during development; `npm run build` emits publishable JavaScript to ignored `dist/`.
 - Install with `npm ci` or `mise run setup`.
 - Run all code checks with `npm run check` or `mise run check`.
 - Individual checks: `npm run format:check`, `npm run lint`, `npm run typecheck`, and `npm test`. Use `npm run format` to rewrite files.
-- After package-content changes, also run `npm pack --dry-run`.
+- After package-content changes, also run `npm run build` and `npm pack --dry-run`.
 - Never use `npx -y`; add required tooling to `devDependencies`.
 
 ## Architecture

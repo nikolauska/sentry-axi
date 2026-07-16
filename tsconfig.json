@@ -3,12 +3,14 @@
     "allowImportingTsExtensions": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "noEmit": true,
+    "outDir": "dist",
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2024",
     "types": ["node"],
     "verbatimModuleSyntax": true
   },
-  "include": ["bin/**/*.ts", "src/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

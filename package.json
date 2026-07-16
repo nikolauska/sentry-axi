@@ -21,15 +21,14 @@
     "url": "git+https://github.com/nikolauska/sentry-axi.git"
   },
   "bin": {
-    "sentry-axi": "bin/sentry-axi"
+    "sentry-axi": "dist/bin.js"
   },
   "files": [
     ".claude-plugin",
     ".codex-plugin",
-    "bin",
     "docs",
     "skills",
-    "src",
+    "dist",
     "LICENSE",
     "README.md"
   ],
@@ -38,6 +37,7 @@
     "access": "public"
   },
   "scripts": {
+    "build": "tsc",
     "build:skill": "node scripts/build-skill.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -46,6 +46,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run build:skill -- --check && npm test",
     "prepublishOnly": "npm run check",
+    "prepack": "npm run build",
     "test": "node --test test/*.test.ts"
   },
   "dependencies": {
