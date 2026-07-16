@@ -21,7 +21,7 @@
     "url": "git+https://github.com/nikolauska/sentry-axi.git"
   },
   "bin": {
-    "sentry-axi": "bin/sentry-axi.ts"
+    "sentry-axi": "bin/sentry-axi"
   },
   "files": [
     ".claude-plugin",
