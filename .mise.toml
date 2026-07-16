@@ -1,0 +1,18 @@
+[tools]
+node = "24"
+
+[tasks.setup]
+description = "Install locked dependencies"
+run = "npm ci"
+
+[tasks.lint]
+description = "Check JavaScript syntax"
+run = "npm run lint"
+
+[tasks.test]
+description = "Run the test suite"
+run = "npm test"
+
+[tasks.check]
+description = "Run all required checks"
+run = "npm run check"

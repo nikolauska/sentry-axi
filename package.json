@@ -1,0 +1,50 @@
+{
+  "name": "@nikolauska/sentry-axi",
+  "version": "0.1.0",
+  "description": "AXI wrapper for the Sentry MCP server",
+  "keywords": [
+    "agent",
+    "agent-skills",
+    "axi",
+    "cli",
+    "mcp",
+    "sentry"
+  ],
+  "homepage": "https://github.com/nikolauska/sentry-axi#readme",
+  "bugs": {
+    "url": "https://github.com/nikolauska/sentry-axi/issues"
+  },
+  "license": "MIT",
+  "author": "nikolauska",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikolauska/sentry-axi.git"
+  },
+  "bin": {
+    "sentry-axi": "bin/sentry-axi"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "lint": "node --check bin/sentry-axi && node --check bin/sentry-axi.js && node --check src/*.js && node --check test/*.js",
+    "check": "npm run lint && npm test",
+    "prepublishOnly": "npm run check",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axi-sdk-js": "^0.1.8"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
