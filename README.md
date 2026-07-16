@@ -14,7 +14,27 @@ npm install --global @nikolauska/sentry-axi
 sentry-axi auth login
 ```
 
-The package also contains matching Codex and Claude plugin manifests and the `sentry-axi` Agent Skill under `skills/`.
+Install the matching plugin for your agent:
+
+### Claude Code
+
+```sh
+claude plugin marketplace add nikolauska/sentry-axi
+claude plugin install sentry-axi@sentry-axi
+```
+
+### Codex
+
+```sh
+codex plugin marketplace add nikolauska/sentry-axi
+codex plugin add sentry-axi@sentry-axi
+```
+
+### GitHub Copilot CLI
+
+```sh
+copilot plugin install nikolauska/sentry-axi
+```
 
 ## Quick start
 
