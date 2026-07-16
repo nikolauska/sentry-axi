@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 
 import { parseFlags, usage } from "../args.js";
+import { callSentryTool, extractText } from "../lib/mcp-tools.js";
 
 export async function authCommand(args, runtime) {
   const [action, ...rest] = args;
@@ -8,6 +9,7 @@ export async function authCommand(args, runtime) {
   if (action === "login") return loginCommand(rest, runtime);
   if (action === "finish") return finishCommand(rest, runtime);
   if (action === "logout") return logoutCommand(rest, runtime);
+  if (action === "whoami") return whoamiCommand(rest, runtime);
   throw usage(`unknown auth action: ${action}`, ["Run `sentry-axi auth --help`"]);
 }
 
@@ -17,7 +19,15 @@ export function authHelp() {
     "  sentry-axi auth login [--manual] [--timeout <ms>]",
     "  sentry-axi auth finish --code <code>",
     "  sentry-axi auth logout",
+    "  sentry-axi auth whoami",
   ].join("\n");
+}
+
+async function whoamiCommand(args, runtime) {
+  const parsed = parseFlags(args, { boolean: ["help"] });
+  if (parsed.help) return authHelp();
+  if (parsed.positionals.length > 0) throw usage("auth whoami does not accept positional arguments");
+  return { identity: extractText(await callSentryTool(runtime, "whoami", {})) };
 }
 
 async function loginCommand(args, runtime) {

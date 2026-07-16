@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 import { runAxiCli } from "axi-sdk-js";
 
 import { authCommand, authHelp } from "./commands/auth.js";
+import { homeCommand } from "./commands/home.js";
+import { initCommand, initHelp } from "./commands/init.js";
 import { resolveMcpUrl } from "./config.js";
 import { SentryMcpClient } from "./mcp.js";
 
@@ -11,6 +13,7 @@ const { version: VERSION } = createRequire(import.meta.url)("../package.json");
 
 const COMMANDS = {
   auth: authCommand,
+  init: initCommand,
 };
 
 export async function main(args, context) {
@@ -19,9 +22,12 @@ export async function main(args, context) {
     description: DESCRIPTION,
     version: VERSION,
     stdout: context.stdout,
-    home: async () => ({ status: "Run `sentry-axi auth login` to connect to Sentry MCP" }),
-    commands: COMMANDS,
-    getCommandHelp: (command) => command === "auth" ? authHelp() : null,
+    home: withCleanup(async (_args, runtime) => homeCommand(runtime)),
+    commands: Object.fromEntries(Object.entries(COMMANDS).map(([name, command]) => [
+      name,
+      withCleanup(command),
+    ])),
+    getCommandHelp: (command) => ({ auth: authHelp, init: initHelp })[command]?.() ?? null,
     resolveContext: () => makeRuntime(context),
     topLevelHelp: topHelp(),
   });
@@ -33,6 +39,7 @@ export function topHelp() {
     "",
     "Usage:",
     "  sentry-axi",
+    "  sentry-axi init --organization <slug> --project <slug>",
     "  sentry-axi auth login",
     "  sentry-axi auth login --manual",
     "  sentry-axi auth finish --code <code>",
@@ -41,9 +48,20 @@ export function topHelp() {
   ].join("\n");
 }
 
+function withCleanup(handler) {
+  return async (args, runtime) => {
+    try {
+      return await handler(args, runtime);
+    } finally {
+      await runtime?.client?.close?.();
+    }
+  };
+}
+
 async function makeRuntime(context) {
   const url = await resolveMcpUrl(context.env);
   return {
+    cwd: context.cwd,
     env: context.env,
     stdout: context.stdout,
     client: context.client ?? new SentryMcpClient({
