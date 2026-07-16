@@ -24,7 +24,10 @@
     "sentry-axi": "bin/sentry-axi.ts"
   },
   "files": [
+    ".claude-plugin",
+    ".codex-plugin",
     "bin",
+    "docs",
     "skills",
     "src",
     "LICENSE",
