@@ -1,7 +1,14 @@
 import { AxiError } from "axi-sdk-js";
 
-export function parseFlags(args, options = {}) {
-  const parsed = { positionals: [] };
+import type { ParsedFlags } from "./types.ts";
+
+interface FlagOptions {
+  boolean?: string[];
+  array?: string[];
+}
+
+export function parseFlags(args: string[], options: FlagOptions = {}): ParsedFlags {
+  const parsed: ParsedFlags = { positionals: [] };
   const booleanFlags = new Set(options.boolean ?? []);
   const arrayFlags = new Set(options.array ?? []);
 
@@ -30,16 +37,19 @@ export function parseFlags(args, options = {}) {
       if (value === undefined) throw usage(`--${name} requires a value`);
     }
 
-    parsed[name] = arrayFlags.has(name) ? [...(parsed[name] ?? []), value] : value;
+    const previous = parsed[name];
+    parsed[name] = arrayFlags.has(name)
+      ? [...(Array.isArray(previous) ? previous : []), String(value)]
+      : value;
   }
   return parsed;
 }
 
-export function usage(message, suggestions = ["Run `sentry-axi --help`"]) {
+export function usage(message: string, suggestions = ["Run `sentry-axi --help`"]) {
   return new AxiError(message, "VALIDATION_ERROR", suggestions);
 }
 
-function parseBoolean(value, flagName) {
+function parseBoolean(value: string, flagName: string): boolean {
   if (value === "true") return true;
   if (value === "false") return false;
   throw usage(`--${flagName} must be true or false`);

@@ -4,12 +4,43 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type {
+  OAuthClientInformationMixed,
+  OAuthClientMetadata,
+  OAuthTokens,
+} from "@modelcontextprotocol/sdk/shared/auth.js";
 
-import { usage } from "./args.js";
+import { usage } from "./args.ts";
+import type { InputRecord, McpResult, McpTool } from "./types.ts";
+
+interface ClientOptions {
+  url: string;
+  mcpToken?: string;
+  sentryToken?: string;
+  fetchImpl?: typeof fetch;
+  authStorePath?: string;
+}
+
+interface OAuthStore {
+  state?: string;
+  clientInformation?: OAuthClientInformationMixed;
+  tokens?: OAuthTokens;
+  codeVerifier?: string;
+}
 
 export class SentryMcpClient {
-  constructor({ url, mcpToken, sentryToken, fetchImpl, authStorePath } = {}) {
+  url: string;
+  mcpToken?: string;
+  sentryToken?: string;
+  fetchImpl?: typeof fetch;
+  authStorePath?: string;
+  authProvider: SentryOAuthProvider | null;
+  client: Client | null = null;
+  transport: StreamableHTTPClientTransport | null = null;
+
+  constructor({ url, mcpToken, sentryToken, fetchImpl, authStorePath }: ClientOptions) {
     if (mcpToken && sentryToken) {
       throw usage("SENTRY_AXI_MCP_TOKEN and SENTRY_ACCESS_TOKEN cannot both be set", [
         "Unset one token and retry",
@@ -22,13 +53,15 @@ export class SentryMcpClient {
     this.sentryToken = sentryToken;
     this.fetchImpl = fetchImpl;
     this.authStorePath = authStorePath;
-    this.authProvider = mcpToken || sentryToken ? null : new SentryOAuthProvider({ storePath: authStorePath });
-    this.client = null;
-    this.transport = null;
+    this.authProvider =
+      mcpToken || sentryToken ? null : new SentryOAuthProvider({ storePath: authStorePath });
   }
 
-  async connect() {
-    const authorization = authorizationHeader({ mcpToken: this.mcpToken, sentryToken: this.sentryToken });
+  async connect(): Promise<void> {
+    const authorization = authorizationHeader({
+      mcpToken: this.mcpToken,
+      sentryToken: this.sentryToken,
+    });
     this.transport = new StreamableHTTPClientTransport(new URL(this.url), {
       requestInit: authorization ? { headers: { authorization } } : undefined,
       authProvider: this.authProvider ?? undefined,
@@ -39,25 +72,26 @@ export class SentryMcpClient {
       await this.client.connect(this.transport);
     } catch (error) {
       if (this.authProvider?.authorizationUrl) {
-        const authError = new Error("Sentry MCP OAuth authorization required");
-        authError.authorizationUrl = this.authProvider.authorizationUrl;
+        const authError = Object.assign(new Error("Sentry MCP OAuth authorization required"), {
+          authorizationUrl: this.authProvider.authorizationUrl,
+        });
         throw authError;
       }
       throw error;
     }
   }
 
-  async listTools() {
+  async listTools(): Promise<McpTool[]> {
     await this.ensureConnected();
-    return (await this.client.listTools()).tools ?? [];
+    return (await this.client!.listTools()).tools ?? [];
   }
 
-  async callTool(name, args) {
+  async callTool(name: string, args: InputRecord): Promise<McpResult> {
     await this.ensureConnected();
-    return this.client.callTool({ name, arguments: args });
+    return (await this.client!.callTool({ name, arguments: args })) as McpResult;
   }
 
-  async finishAuth(code) {
+  async finishAuth(code: string): Promise<void> {
     this.transport = new StreamableHTTPClientTransport(new URL(this.url), {
       authProvider: this.authProvider ?? undefined,
       fetch: this.fetchImpl,
@@ -65,34 +99,38 @@ export class SentryMcpClient {
     await this.transport.finishAuth(code);
   }
 
-  async logoutAuth() {
-    const provider = this.authProvider ?? new SentryOAuthProvider({ storePath: this.authStorePath });
+  async logoutAuth(): Promise<{ removed: boolean; tokenConfigured: boolean }> {
+    const provider =
+      this.authProvider ?? new SentryOAuthProvider({ storePath: this.authStorePath });
     return {
       removed: await provider.deleteStore(),
       tokenConfigured: Boolean(this.mcpToken || this.sentryToken),
     };
   }
 
-  async close() {
+  async close(): Promise<void> {
     await this.transport?.close();
   }
 
-  async ensureConnected() {
+  async ensureConnected(): Promise<void> {
     if (!this.client) await this.connect();
   }
 }
 
-export class SentryOAuthProvider {
-  constructor({ storePath } = {}) {
+export class SentryOAuthProvider implements OAuthClientProvider {
+  storePath: string;
+  authorizationUrl: string | null = null;
+
+  constructor({ storePath }: { storePath?: string } = {}) {
     this.storePath = storePath ?? defaultAuthStorePath();
     this.authorizationUrl = null;
   }
 
-  get redirectUrl() {
+  get redirectUrl(): string {
     return "http://127.0.0.1:14567/oauth/callback";
   }
 
-  get clientMetadata() {
+  get clientMetadata(): OAuthClientMetadata {
     return {
       client_name: "sentry-axi",
       redirect_uris: [this.redirectUrl],
@@ -102,7 +140,7 @@ export class SentryOAuthProvider {
     };
   }
 
-  async state() {
+  async state(): Promise<string> {
     const store = await this.readStore();
     if (store.state) return store.state;
     const state = randomBytes(24).toString("base64url");
@@ -110,20 +148,32 @@ export class SentryOAuthProvider {
     return state;
   }
 
-  async clientInformation() { return (await this.readStore()).clientInformation; }
-  async saveClientInformation(value) { await this.updateStore({ clientInformation: value }); }
-  async tokens() { return (await this.readStore()).tokens; }
-  async saveTokens(value) { await this.updateStore({ tokens: value }); }
-  async redirectToAuthorization(url) { this.authorizationUrl = url.toString(); }
-  async saveCodeVerifier(value) { await this.updateStore({ codeVerifier: value }); }
+  async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
+    return (await this.readStore()).clientInformation;
+  }
+  async saveClientInformation(value: OAuthClientInformationMixed): Promise<void> {
+    await this.updateStore({ clientInformation: value });
+  }
+  async tokens(): Promise<OAuthTokens | undefined> {
+    return (await this.readStore()).tokens;
+  }
+  async saveTokens(value: OAuthTokens): Promise<void> {
+    await this.updateStore({ tokens: value });
+  }
+  async redirectToAuthorization(url: URL): Promise<void> {
+    this.authorizationUrl = url.toString();
+  }
+  async saveCodeVerifier(value: string): Promise<void> {
+    await this.updateStore({ codeVerifier: value });
+  }
 
-  async codeVerifier() {
+  async codeVerifier(): Promise<string> {
     const value = (await this.readStore()).codeVerifier;
     if (!value) throw new Error("No OAuth code verifier saved");
     return value;
   }
 
-  async invalidateCredentials(scope) {
+  async invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier"): Promise<void> {
     const store = await this.readStore();
     if (scope === "all" || scope === "client") delete store.clientInformation;
     if (scope === "all" || scope === "tokens") delete store.tokens;
@@ -134,17 +184,17 @@ export class SentryOAuthProvider {
     await this.writeStore(store);
   }
 
-  async deleteStore() {
+  async deleteStore(): Promise<boolean> {
     try {
       await rm(this.storePath);
       return true;
     } catch (error) {
-      if (error?.code === "ENOENT") return false;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       throw error;
     }
   }
 
-  async readStore() {
+  async readStore(): Promise<OAuthStore> {
     try {
       return JSON.parse(await readFile(this.storePath, "utf8"));
     } catch {
@@ -152,24 +202,34 @@ export class SentryOAuthProvider {
     }
   }
 
-  async updateStore(patch) {
+  async updateStore(patch: Partial<OAuthStore>): Promise<void> {
     await this.writeStore({ ...(await this.readStore()), ...patch });
   }
 
-  async writeStore(store) {
+  async writeStore(store: OAuthStore): Promise<void> {
     await mkdir(dirname(this.storePath), { recursive: true });
     await writeFile(this.storePath, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
     await chmod(this.storePath, 0o600);
   }
 }
 
-export function authorizationHeader({ mcpToken, sentryToken }) {
+export function authorizationHeader({
+  mcpToken,
+  sentryToken,
+}: {
+  mcpToken?: string;
+  sentryToken?: string;
+}): string | null {
   if (mcpToken && sentryToken) throw usage("Only one token type may be configured");
   if (mcpToken) return `Bearer ${mcpToken}`;
   if (sentryToken) return `Sentry-Bearer ${sentryToken}`;
   return null;
 }
 
-function defaultAuthStorePath() {
-  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "sentry-axi", "oauth.json");
+function defaultAuthStorePath(): string {
+  return join(
+    process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"),
+    "sentry-axi",
+    "oauth.json",
+  );
 }

@@ -6,8 +6,20 @@ description = "Install locked dependencies"
 run = "npm ci"
 
 [tasks.lint]
-description = "Check JavaScript syntax"
+description = "Lint TypeScript with Oxlint"
 run = "npm run lint"
+
+[tasks.format]
+description = "Format the repository with Oxfmt"
+run = "npm run format"
+
+[tasks."format:check"]
+description = "Check formatting with Oxfmt"
+run = "npm run format:check"
+
+[tasks.typecheck]
+description = "Type-check without emitting files"
+run = "npm run typecheck"
 
 [tasks.test]
 description = "Run the test suite"

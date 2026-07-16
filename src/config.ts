@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 export const DEFAULT_MCP_URL = "https://mcp.sentry.dev/mcp";
 
-export async function resolveMcpUrl(env) {
+export async function resolveMcpUrl(env: NodeJS.ProcessEnv): Promise<string> {
   if (env.SENTRY_AXI_MCP_URL) return env.SENTRY_AXI_MCP_URL;
 
   const configPath = env.CODEX_CONFIG ?? join(homedir(), ".codex", "config.toml");
@@ -15,7 +15,7 @@ export async function resolveMcpUrl(env) {
   }
 }
 
-export function extractSentryMcpUrl(text) {
+export function extractSentryMcpUrl(text: string): string | null {
   let inSentryTable = false;
   for (const line of text.split(/\r?\n/)) {
     const table = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/);

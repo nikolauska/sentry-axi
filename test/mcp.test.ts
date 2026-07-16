@@ -4,22 +4,35 @@ import { chmod, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { SentryMcpClient, SentryOAuthProvider, authorizationHeader } from "../src/mcp.js";
+import { SentryMcpClient, SentryOAuthProvider, authorizationHeader } from "../src/mcp.ts";
 
 test("uses OAuth only when no token is configured", () => {
-  assert.ok(new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp" }).authProvider instanceof SentryOAuthProvider);
-  assert.equal(new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp", sentryToken: "secret" }).authProvider, null);
+  assert.ok(
+    new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp" }).authProvider instanceof
+      SentryOAuthProvider,
+  );
+  assert.equal(
+    new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp", sentryToken: "secret" }).authProvider,
+    null,
+  );
 });
 
 test("uses distinct authorization schemes", () => {
   assert.equal(authorizationHeader({ mcpToken: "mcp" }), "Bearer mcp");
   assert.equal(authorizationHeader({ sentryToken: "sentry" }), "Sentry-Bearer sentry");
   assert.equal(authorizationHeader({}), null);
-  assert.throws(() => authorizationHeader({ mcpToken: "mcp", sentryToken: "sentry" }), /Only one token/);
+  assert.throws(
+    () => authorizationHeader({ mcpToken: "mcp", sentryToken: "sentry" }),
+    /Only one token/,
+  );
 });
 
 test("rejects ambiguous token configuration", () => {
-  assert.throws(() => new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp", mcpToken: "a", sentryToken: "b" }), /cannot both be set/);
+  assert.throws(
+    () =>
+      new SentryMcpClient({ url: "https://mcp.sentry.dev/mcp", mcpToken: "a", sentryToken: "b" }),
+    /cannot both be set/,
+  );
 });
 
 test("OAuth state persists with private permissions", async () => {

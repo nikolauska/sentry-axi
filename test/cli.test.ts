@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DESCRIPTION, topHelp } from "../src/cli.js";
+import { DESCRIPTION, topHelp } from "../src/cli.ts";
 
 test("describes the Sentry AXI", () => {
   assert.match(DESCRIPTION, /Sentry MCP/);
