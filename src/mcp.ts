@@ -62,7 +62,7 @@ export class SentryMcpClient {
       mcpToken: this.mcpToken,
       sentryToken: this.sentryToken,
     });
-    this.transport = new StreamableHTTPClientTransport(new URL(this.url), {
+    this.transport = new StreamableHTTPClientTransport(parseMcpUrl(this.url), {
       requestInit: authorization ? { headers: { authorization } } : undefined,
       authProvider: this.authProvider ?? undefined,
       fetch: this.fetchImpl,
@@ -81,18 +81,20 @@ export class SentryMcpClient {
     }
   }
 
-  async listTools(): Promise<McpTool[]> {
+  async listTools(signal?: AbortSignal): Promise<McpTool[]> {
     await this.ensureConnected();
-    return (await this.client!.listTools()).tools ?? [];
+    return (await this.client!.listTools(undefined, { signal })).tools ?? [];
   }
 
-  async callTool(name: string, args: InputRecord): Promise<McpResult> {
+  async callTool(name: string, args: InputRecord, signal?: AbortSignal): Promise<McpResult> {
     await this.ensureConnected();
-    return (await this.client!.callTool({ name, arguments: args })) as McpResult;
+    return (await this.client!.callTool({ name, arguments: args }, undefined, {
+      signal,
+    })) as McpResult;
   }
 
   async finishAuth(code: string): Promise<void> {
-    this.transport = new StreamableHTTPClientTransport(new URL(this.url), {
+    this.transport = new StreamableHTTPClientTransport(parseMcpUrl(this.url), {
       authProvider: this.authProvider ?? undefined,
       fetch: this.fetchImpl,
     });
@@ -224,6 +226,16 @@ export function authorizationHeader({
   if (mcpToken) return `Bearer ${mcpToken}`;
   if (sentryToken) return `Sentry-Bearer ${sentryToken}`;
   return null;
+}
+
+function parseMcpUrl(value: string): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw usage("Sentry MCP URL is invalid", [
+      "Set SENTRY_AXI_MCP_URL to an absolute HTTP or HTTPS URL",
+    ]);
+  }
 }
 
 function defaultAuthStorePath(): string {

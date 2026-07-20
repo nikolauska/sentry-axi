@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { parseFlags, usage } from "../args.ts";
 import { CATALOG } from "../catalog.ts";
 import type { CatalogSpec } from "../catalog.ts";
@@ -26,7 +28,7 @@ export function catalogCommand(group: string) {
       command,
       full: Boolean(parsed.full),
       select: stringValue(parsed.select),
-      output: stringValue(parsed.output),
+      output: outputPath(parsed.output, runtime.cwd),
       binaryRequired: spec.binary,
     });
   };
@@ -181,6 +183,14 @@ function cliName(param: string): string {
 
 function commandText(group: string, action: string, args: string[]): string {
   return ["sentry-axi", group, action, ...args.filter((arg) => arg !== "--full")].join(" ");
+}
+
+function outputPath(
+  value: string | string[] | boolean | undefined,
+  cwd: string,
+): string | undefined {
+  const path = stringValue(value);
+  return path ? resolve(cwd, path) : undefined;
 }
 
 function stringValue(value: string | string[] | boolean | undefined): string | undefined {

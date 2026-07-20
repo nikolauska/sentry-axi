@@ -22,8 +22,8 @@ export interface McpResult {
 }
 
 export interface McpClientLike {
-  listTools(): Promise<McpTool[]>;
-  callTool(name: string, args: InputRecord): Promise<McpResult>;
+  listTools(signal?: AbortSignal): Promise<McpTool[]>;
+  callTool(name: string, args: InputRecord, signal?: AbortSignal): Promise<McpResult>;
   finishAuth?(code: string): Promise<void>;
   logoutAuth?(): Promise<{ removed: boolean; tokenConfigured: boolean }>;
   close?(): Promise<void>;
@@ -37,6 +37,7 @@ export interface Runtime {
   mcpUrl: string;
   binPath?: string;
   toolNames?: Set<string>;
+  signal?: AbortSignal;
 }
 
 export interface MainContext {
@@ -44,6 +45,7 @@ export interface MainContext {
   env: NodeJS.ProcessEnv;
   stdout: Pick<Writable, "write">;
   client?: McpClientLike;
+  signal?: AbortSignal;
 }
 
 export interface ParsedFlags {

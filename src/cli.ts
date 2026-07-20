@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { runAxiCli } from "axi-sdk-js";
 import type { AxiCliCommand } from "axi-sdk-js";
 
+import { usage } from "./args.ts";
 import { authCommand, authHelp } from "./commands/auth.ts";
 import { catalogCommand, groupHelp } from "./commands/catalog.ts";
 import { homeCommand } from "./commands/home.ts";
@@ -22,6 +23,14 @@ const COMMANDS: Record<string, RuntimeCommand> = {
   init: initCommand,
   ...Object.fromEntries(Object.keys(CATALOG).map((group) => [group, catalogCommand(group)])),
 };
+
+export async function run(args: string[], runtime: Runtime): Promise<Renderable> {
+  const [command, ...rest] = args;
+  if (!command) return homeCommand(runtime);
+  const handler = COMMANDS[command];
+  if (!handler) throw usage(`unknown command: ${command}`);
+  return handler(rest, runtime);
+}
 
 export async function main(args: string[], context: MainContext): Promise<void> {
   await runAxiCli<Runtime>({
@@ -71,7 +80,7 @@ function withCleanup(handler: RuntimeCommand): AxiCliCommand<Runtime> {
   };
 }
 
-async function makeRuntime(context: MainContext): Promise<Runtime> {
+export async function makeRuntime(context: MainContext): Promise<Runtime> {
   const url = await resolveMcpUrl(context.env);
   return {
     cwd: context.cwd,
@@ -87,6 +96,7 @@ async function makeRuntime(context: MainContext): Promise<Runtime> {
       }),
     binPath: executablePath(),
     mcpUrl: url,
+    signal: context.signal,
   };
 }
 

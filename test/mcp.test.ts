@@ -35,6 +35,11 @@ test("rejects ambiguous token configuration", () => {
   );
 });
 
+test("rejects an invalid MCP URL with a recovery hint", async () => {
+  const client = new SentryMcpClient({ url: "not-a-url" });
+  await assert.rejects(client.connect(), /Sentry MCP URL is invalid/);
+});
+
 test("OAuth state persists with private permissions", async () => {
   const dir = await mkdtemp(join(tmpdir(), "sentry-axi-oauth-"));
   const storePath = join(dir, "oauth.json");
@@ -42,15 +47,23 @@ test("OAuth state persists with private permissions", async () => {
   const first = await provider.state();
   assert.equal(await provider.state(), first);
   await chmod(storePath, 0o666);
-  await provider.saveTokens({ access_token: "updated" });
+  await provider.saveTokens({ access_token: "updated", token_type: "Bearer" });
   assert.equal((await stat(storePath)).mode & 0o777, 0o600);
-  assert.equal(JSON.parse(await readFile(storePath, "utf8")).state, first);
+  assert.equal((await readJson(storePath)).state, first);
 });
 
 test("OAuth logout is idempotent", async () => {
   const dir = await mkdtemp(join(tmpdir(), "sentry-axi-oauth-"));
   const provider = new SentryOAuthProvider({ storePath: join(dir, "oauth.json") });
-  await provider.saveTokens({ access_token: "secret" });
+  await provider.saveTokens({ access_token: "secret", token_type: "Bearer" });
   assert.equal(await provider.deleteStore(), true);
   assert.equal(await provider.deleteStore(), false);
 });
+
+async function readJson(path: string): Promise<Record<string, unknown>> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  } catch (error) {
+    assert.fail(`Failed to parse OAuth store: ${String(error)}`);
+  }
+}

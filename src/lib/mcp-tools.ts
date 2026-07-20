@@ -7,11 +7,15 @@ export async function callSentryTool(
   args: InputRecord,
 ): Promise<McpResult> {
   const names = await availableToolNames(runtime);
-  if (names.has(name)) return runtime.client.callTool(name, args);
+  if (names.has(name)) return runtime.client.callTool(name, args, runtime.signal);
   if (names.has("execute_sentry_tool")) {
-    return runtime.client.callTool("execute_sentry_tool", { name, arguments: args });
+    return runtime.client.callTool(
+      "execute_sentry_tool",
+      { name, arguments: args },
+      runtime.signal,
+    );
   }
-  if (names.size === 0) return runtime.client.callTool(name, args);
+  if (names.size === 0) return runtime.client.callTool(name, args, runtime.signal);
   throw new AxiError(
     `Sentry MCP tool is unavailable in this session: ${name}`,
     "TOOL_UNAVAILABLE",
@@ -22,9 +26,9 @@ export async function callSentryTool(
   );
 }
 
-export async function availableToolNames(runtime: Runtime): Promise<Set<string>> {
+async function availableToolNames(runtime: Runtime): Promise<Set<string>> {
   if (!runtime.toolNames) {
-    const tools = await runtime.client.listTools();
+    const tools = await runtime.client.listTools(runtime.signal);
     runtime.toolNames = new Set(tools.map((tool) => tool.name));
   }
   return runtime.toolNames;

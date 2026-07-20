@@ -9,6 +9,24 @@ Agent-friendly TypeScript CLI for the [Sentry MCP server](https://mcp.sentry.dev
 
 ## Install
 
+### Pi extension
+
+Install the pi package to register the native `sentry_axi` tool and bundled Agent Skill:
+
+```sh
+pi install npm:@nikolauska/sentry-axi
+```
+
+The tool accepts a command group as `action` and the remaining CLI arguments as `args`, for example:
+
+```json
+{ "action": "issues", "args": ["search", "unresolved errors", "--limit", "10"] }
+```
+
+Pi provides the extension runtime, so no separate global CLI install is required for the native tool.
+
+### Standalone CLI and plugins
+
 ```sh
 npm install --global @nikolauska/sentry-axi
 sentry-axi auth login
@@ -112,7 +130,7 @@ npm test
 npm run check
 ```
 
-Development source runs directly as TypeScript. `npm run build` emits the JavaScript published from `dist/`. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`.
+Development source runs directly as TypeScript. `npm run build` emits the JavaScript published from `dist/`. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`. To test the pi package directly from a checkout, run `npm run build && pi -e .`.
 
 ## License
 
