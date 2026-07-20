@@ -15,7 +15,6 @@ import { encode } from "@toon-format/toon";
 import { AxiError } from "axi-sdk-js";
 import { Type } from "typebox";
 
-import { makeRuntime, run } from "./cli.ts";
 import type { MainContext, Renderable, Runtime } from "./types.ts";
 
 const ACTIONS = [
@@ -82,8 +81,10 @@ function formatError(error: unknown): string {
 
 export function registerSentryExtension(
   pi: ExtensionAPI,
-  runtimeFactory: RuntimeFactory = makeRuntime,
-  dispatch: Dispatcher = run,
+  // OMP's install-time validator rejects the MCP client's transitive CJS graph; load it on use.
+  runtimeFactory: RuntimeFactory = async (context) =>
+    (await import("./cli.ts")).makeRuntime(context),
+  dispatch: Dispatcher = async (args, runtime) => (await import("./cli.ts")).run(args, runtime),
 ): void {
   pi.registerTool({
     name: "sentry_axi",
