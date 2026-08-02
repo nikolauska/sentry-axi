@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { runAxiCli } from "axi-sdk-js";
+import { AxiError, installSessionStartHooks, runAxiCli } from "axi-sdk-js";
 import type { AxiCliCommand } from "axi-sdk-js";
 
 import { usage } from "./args.ts";
@@ -21,6 +21,7 @@ type RuntimeCommand = (args: string[], runtime: Runtime) => Renderable | Promise
 const COMMANDS: Record<string, RuntimeCommand> = {
   auth: authCommand,
   init: initCommand,
+  setup: setupCommand,
   ...Object.fromEntries(Object.keys(CATALOG).map((group) => [group, catalogCommand(group)])),
 };
 
@@ -43,8 +44,9 @@ export async function main(args: string[], context: MainContext): Promise<void> 
       Object.entries(COMMANDS).map(([name, command]) => [name, withCleanup(command)]),
     ),
     getCommandHelp: (command) =>
-      (({ auth: authHelp, init: initHelp }) as Record<string, () => string>)[command]?.() ??
-      (CATALOG[command] ? groupHelp(command) : null),
+      (({ auth: authHelp, init: initHelp, setup: setupHelp }) as Record<string, () => string>)[
+        command
+      ]?.() ?? (CATALOG[command] ? groupHelp(command) : null),
     resolveContext: () => makeRuntime(context),
     topLevelHelp: topHelp(),
   });
@@ -57,6 +59,7 @@ export function topHelp() {
     "Usage:",
     "  sentry-axi",
     "  sentry-axi init --organization <slug> --project <slug>",
+    "  sentry-axi setup hooks",
     '  sentry-axi issues search --query "unresolved errors"',
     '  sentry-axi tools search "snapshot images"',
     "  sentry-axi auth login",
@@ -65,7 +68,34 @@ export function topHelp() {
     "  sentry-axi auth logout",
     "  sentry-axi --help",
     "",
-    `Commands: auth, init, ${Object.keys(CATALOG).join(", ")}`,
+    `Commands: auth, init, setup, ${Object.keys(CATALOG).join(", ")}`,
+  ].join("\n");
+}
+
+function setupCommand(args: string[]): Renderable {
+  if (args.length !== 1 || args[0] !== "hooks") {
+    throw usage("setup requires `hooks`", ["Run `sentry-axi setup hooks`"]);
+  }
+  const errors: string[] = [];
+  installSessionStartHooks({
+    marker: "sentry-axi",
+    binaryNames: ["sentry-axi"],
+    onError: (message) => errors.push(message),
+  });
+  if (errors.length > 0) {
+    throw new AxiError(errors.join("; "), "BACKEND_ERROR", [
+      "Run `sentry-axi setup hooks` after fixing the reported files",
+    ]);
+  }
+  return { setup: "hooks installed or already up to date" };
+}
+
+function setupHelp(): string {
+  return [
+    "Usage:",
+    "  sentry-axi setup hooks",
+    "",
+    "Installs or repairs user-level session-start hooks for Claude Code, Codex, and OpenCode.",
   ].join("\n");
 }
 

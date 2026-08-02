@@ -9,50 +9,28 @@ Agent-friendly TypeScript CLI for the [Sentry MCP server](https://mcp.sentry.dev
 
 ## Install
 
-### Pi extension
-
-Install the pi package to register the native `sentry_axi` tool and bundled Agent Skill:
-
-```sh
-pi install npm:@nikolauska/sentry-axi
-```
-
-The tool accepts a command group as `action` and the remaining CLI arguments as `args`, for example:
-
-```json
-{ "action": "issues", "args": ["search", "unresolved errors", "--limit", "10"] }
-```
-
-Pi provides the extension runtime, so no separate global CLI install is required for the native tool.
-
-### Standalone CLI and plugins
+Install the standalone CLI globally so `sentry-axi` is available on `PATH`:
 
 ```sh
 npm install --global @nikolauska/sentry-axi
 sentry-axi auth login
 ```
 
-Install the matching plugin for your agent:
-
-### Claude Code
+Session hooks are an explicit, optional integration:
 
 ```sh
-claude plugin marketplace add nikolauska/sentry-axi
-claude plugin install sentry-axi@sentry-axi
+sentry-axi setup hooks
 ```
 
-### Codex
+The command idempotently installs or repairs user-level session-start hooks for Claude Code, Codex, and OpenCode. Hooks resolve `sentry-axi` from `PATH` when it identifies the current executable and otherwise retain its absolute path.
+
+As a lower-overhead alternative, install the static [`sentry-axi` skill](skills/sentry-axi/SKILL.md):
 
 ```sh
-codex plugin marketplace add nikolauska/sentry-axi
-codex plugin add sentry-axi@sentry-axi
+skills add nikolauska/sentry-axi --skill sentry-axi
 ```
 
-### GitHub Copilot CLI
-
-```sh
-copilot plugin install nikolauska/sentry-axi
-```
+Hooks provide ambient session context; the skill loads on demand. Install either integration or both after installing the standalone binary.
 
 ## Quick start
 
@@ -98,7 +76,7 @@ Environment variables:
 | `SENTRY_ACCESS_TOKEN`  | Sentry API token, sent as `Sentry-Bearer` |
 | `SENTRY_AXI_AUTH_FILE` | Override the saved OAuth credential path  |
 
-The two token variables are mutually exclusive. When no URL override is present, sentry-axi also recognizes the `mcp_servers.sentry` URL in the Codex TOML config. Scoped endpoints such as `/mcp/<organization>/<project>` constrain commands and reject conflicting flags or repository bindings.
+The two token variables are mutually exclusive. Scoped endpoints such as `/mcp/<organization>/<project>` constrain commands and reject conflicting flags or repository bindings.
 
 ## Repository context and output
 
@@ -130,7 +108,7 @@ npm test
 npm run check
 ```
 
-Development source runs directly as TypeScript. `npm run build` emits the JavaScript published from `dist/`. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`. To test the pi package directly from a checkout, run `npm run build && pi -e .`.
+Development source runs directly as TypeScript. `npm run build` emits the JavaScript published from `dist/`. Update `src/skill.ts` or the command catalog, then run `npm run build:skill` and commit the generated `skills/sentry-axi/SKILL.md`. Run `npm pack --dry-run` to inspect the standalone package contents.
 
 ## License
 

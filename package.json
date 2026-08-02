@@ -8,7 +8,6 @@
     "axi",
     "cli",
     "mcp",
-    "pi-package",
     "sentry"
   ],
   "homepage": "https://github.com/nikolauska/sentry-axi#readme",
@@ -22,24 +21,20 @@
     "url": "git+https://github.com/nikolauska/sentry-axi.git"
   },
   "bin": {
-    "sentry-axi": "dist/bin.js"
+    "sentry-axi": "dist/bin/sentry-axi.js"
   },
   "files": [
-    ".claude-plugin",
-    ".codex-plugin",
-    "docs",
-    "skills",
-    "dist",
-    "LICENSE",
-    "README.md"
+    "dist/",
+    "skills/"
   ],
   "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc && node -e \"require('node:fs').chmodSync('dist/bin/sentry-axi.js', 0o755)\"",
     "build:skill": "node scripts/build-skill.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint",
@@ -56,28 +51,12 @@
     "axi-sdk-js": "^0.1.8"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.80.10",
-    "@earendil-works/pi-coding-agent": "^0.80.10",
     "@types/node": "^26.1.1",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.74.0",
-    "typebox": "^1.3.6",
     "typescript": "^7.0.2"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "typebox": "*"
   },
   "engines": {
     "node": ">=24"
-  },
-  "pi": {
-    "extensions": [
-      "./dist/extension.js"
-    ],
-    "skills": [
-      "./skills"
-    ]
   }
 }

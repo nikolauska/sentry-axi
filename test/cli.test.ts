@@ -6,4 +6,5 @@ import { DESCRIPTION, topHelp } from "../src/cli.ts";
 test("describes the Sentry AXI", () => {
   assert.match(DESCRIPTION, /Sentry MCP/);
   assert.match(topHelp(), /sentry-axi --help/);
+  assert.match(topHelp(), /sentry-axi setup hooks/);
 });
