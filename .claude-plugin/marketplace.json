@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sentry-axi",
+  "description": "Agent-friendly Sentry operations through compact, actionable output.",
+  "owner": {
+    "name": "Niko Lehtovirta",
+    "url": "https://github.com/nikolauska"
+  },
+  "plugins": [
+    {
+      "name": "sentry-axi",
+      "description": "Operate Sentry through the sentry-axi CLI and Agent Skill.",
+      "source": "./",
+      "category": "Productivity",
+      "tags": ["sentry", "agent-skills", "TOON"]
+    }
+  ]
+}

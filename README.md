@@ -9,12 +9,36 @@ Agent-friendly TypeScript CLI for the [Sentry MCP server](https://mcp.sentry.dev
 
 ## Install
 
-Install the standalone CLI globally so `sentry-axi` is available on `PATH`:
+### Standalone CLI
+
+Install the standalone CLI globally so `sentry-axi` is available on `PATH`, then authenticate:
 
 ```sh
 npm install --global @nikolauska/sentry-axi
 sentry-axi auth login
 ```
+
+### Claude Code, Codex, and GitHub Copilot CLI plugins
+
+Add and install the marketplace plugin:
+
+```text
+# Claude Code
+/plugin marketplace add nikolauska/sentry-axi
+/plugin install sentry-axi@sentry-axi
+
+# Codex
+codex plugin marketplace add nikolauska/sentry-axi
+codex plugin add sentry-axi@sentry-axi
+
+# GitHub Copilot CLI
+copilot plugin marketplace add nikolauska/sentry-axi
+copilot plugin install sentry-axi@sentry-axi
+```
+
+The plugin installs only the existing Agent Skill guidance. It does not install the `sentry-axi` CLI, configure session hooks, or provide Sentry credentials. The global CLI installation and `sentry-axi auth login` shown above remain prerequisites.
+
+### Session hooks
 
 Session hooks are an explicit, optional integration:
 
@@ -23,6 +47,8 @@ sentry-axi setup hooks
 ```
 
 The command idempotently installs or repairs user-level session-start hooks for Claude Code, Codex, and OpenCode. Hooks resolve `sentry-axi` from `PATH` when it identifies the current executable and otherwise retain its absolute path.
+
+### Portable Agent Skill
 
 As a lower-overhead alternative, install the static [`sentry-axi` skill](skills/sentry-axi/SKILL.md):
 
