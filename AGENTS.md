@@ -1,41 +1,23 @@
 # Repository guide
 
-This is an agent-oriented TypeScript CLI wrapping the remote Sentry MCP server.
+This is a TypeScript CLI for agents working with Sentry through its remote MCP server. Use `CONTRIBUTING.md` for setup and validation details; use `docs/domain/how-sentry-axi-works.md` when changing product behavior.
 
-## Stack and commands
+## Where to change behavior
 
-- Node.js 24+ runs TypeScript source directly during development; `npm run build` emits publishable JavaScript to ignored `dist/`.
-- Install with `npm ci` or `mise run setup`.
-- Run all code checks with `npm run check` or `mise run check`.
-- Individual checks: `npm run format:check`, `npm run lint`, `npm run typecheck`, and `npm test`. Use `npm run format` to rewrite files.
-- After package-content changes, also run `npm run build` and `npm pack --dry-run`.
-- Never use `npx -y`; add required tooling to `devDependencies`.
+- `src/cli.ts` registers commands; `src/catalog.ts` maps CLI actions to MCP tools. Keep shared parsing and repository defaults in `src/commands/catalog.ts`.
+- `src/mcp.ts` owns transport, OAuth persistence, and token headers; `src/repo.ts` owns `.sentry-project` and endpoint scope; `src/output.ts` owns result shaping and binary writes.
+- When changing the agent skill, edit `src/skill.ts`, run `npm run build:skill`, and include the generated `skills/sentry-axi/SKILL.md`. Do not edit the generated file directly.
 
-## Architecture
+## Behavior to preserve
 
-- `bin/sentry-axi.ts` is the executable entry point.
-- `src/cli.ts` registers AXI commands and builds the MCP runtime.
-- `src/catalog.ts` is the declarative mapping from CLI actions to Sentry MCP tools. Keep shared parsing and repository-default behavior in `src/commands/catalog.ts`.
-- `src/mcp.ts` owns remote transport, OAuth persistence, and token header semantics.
-- `src/repo.ts` owns `.sentry-project` discovery, validation, and endpoint constraints.
-- `src/output.ts` owns compact results, field selection, truncation, and binary file writes.
-- `src/skill.ts` generates `skills/sentry-axi/SKILL.md` through `npm run build:skill`; commit both source and generated changes.
+- Keep stdout structured for agents and errors actionable. Default to `https://mcp.sentry.dev/mcp`.
+- `SENTRY_AXI_MCP_TOKEN` uses `Bearer`; `SENTRY_ACCESS_TOKEN` uses `Sentry-Bearer`. Reject both together. Never expose tokens or saved OAuth credentials; credential files must remain mode `0600`.
+- Endpoint organization/project constraints take precedence over repository defaults. Require `--output` for attachment and image bytes; never write binary data to stdout.
+- Treat creates and updates as mutations: never retry automatically after an ambiguous failure that could duplicate an operation.
 
-## Contracts
+## Working locally
 
-- Preserve agent-readable structured stdout. Errors must include a useful recovery hint.
-- Default remote endpoint: `https://mcp.sentry.dev/mcp`.
-- `SENTRY_AXI_MCP_TOKEN` uses `Bearer`; `SENTRY_ACCESS_TOKEN` uses `Sentry-Bearer`; reject simultaneous configuration.
-- Never print tokens or saved OAuth credentials. Keep credential files at mode `0600`.
-- Respect organization/project constraints encoded in the endpoint before repository defaults.
-- Require `--output` before writing attachment or image bytes; never emit binary data to stdout.
-- Treat create and update commands as mutations. Do not add implicit retries that could duplicate a mutation.
-
-## Change workflow
-
-- Add or update catalog and output tests when changing a tool mapping, flag conversion, default, or response policy.
-- Prefer table-driven catalog coverage over one handler per MCP tool.
-- Keep dependencies and abstractions minimal.
-- Format with Oxfmt and lint with Oxlint; do not hand-format around their output.
-- Make small conventional commits with a short body describing what changed and why.
-- Never publish locally or create release tags unless explicitly requested; tagged CI performs publishing.
+- Use Node.js 24+ and `npm ci` for setup. Choose focused checks for the changed behavior; `npm run check` runs formatting, lint, typecheck, generated-skill verification, and tests. Use `npm run format` for Oxfmt formatting rather than hand-formatting around it.
+- For tool mappings, flags, defaults, or response policy changes, update catalog/output tests as appropriate; prefer table-driven catalog coverage.
+- For package-content changes, run `npm run build` and `npm pack --dry-run` to inspect the published contents.
+- Keep dependencies and abstractions minimal. Make small conventional commits with a short body explaining why. Do not publish or create release tags without an explicit request; tagged CI publishes releases.
