@@ -39,4 +39,4 @@ npx skills add nikolauska/sentry-axi -g
 
 These options install the agent instructions. The `sentry-axi` command must still be installed separately.
 
-Read [how sentry-axi works](docs/domain/how-sentry-axi-works.md) for the product workflow and [CONTRIBUTING.md](CONTRIBUTING.md) to work on the project. For agent usage, see the [sentry-axi skill](skills/sentry-axi/SKILL.md).
+Run `sentry-axi --help` for the usage guide: workflow, output conventions, safety rules, and every command group. The [sentry-axi skill](skills/sentry-axi/SKILL.md) points agents there. Read [how sentry-axi works](docs/domain/how-sentry-axi-works.md) for the product workflow and [CONTRIBUTING.md](CONTRIBUTING.md) to work on the project.

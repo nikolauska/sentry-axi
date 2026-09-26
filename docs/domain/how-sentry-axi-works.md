@@ -24,13 +24,17 @@ The CLI connects to Sentry's hosted MCP endpoint by default. When the endpoint r
 sentry-axi auth login
 ```
 
-For agent-specific setup and usage, see the [sentry-axi skill](../../skills/sentry-axi/SKILL.md). Optional session hooks can provide repository context automatically at the start of a supported agent session:
+Login waits up to five minutes for the browser to return to a local callback. When the shell cannot wait, `sentry-axi auth login --manual` prints the URL and `sentry-axi auth finish --code <code>` completes the sign-in.
+
+`sentry-axi --help` is the usage guide for agents and people alike; the [sentry-axi skill](../../skills/sentry-axi/SKILL.md) only tells agents to read it. Optional session hooks can provide repository context automatically at the start of a supported agent session:
 
 ```sh
 sentry-axi setup hooks
+sentry-axi setup hooks status
+sentry-axi setup hooks remove
 ```
 
-The hook setup is explicit and safe to rerun. It installs or repairs user-level session hooks for Claude Code, Codex, and OpenCode.
+The hook setup is explicit and safe to rerun. It installs or repairs user-level session hooks for Claude Code, Codex, and OpenCode, and reports success only after confirming the hooks are on disk. Codex also needs `[features] hooks = true` in `~/.codex/config.toml`; setup turns it on, and removal leaves it in place because other tools may rely on it.
 
 ## Connect to Sentry
 
@@ -40,7 +44,7 @@ After authentication, commands run against the organizations and projects availa
 
 ## Choose the working scope
 
-An AI agent can bind a Git repository to a default Sentry organization and project. sentry-axi validates both before saving them in `.sentry-project`.
+An AI agent can bind a Git repository to a default Sentry organization and project. sentry-axi checks that both slugs exist exactly as written before saving them in `.sentry-project`; a near match is reported as not found together with the similar slugs Sentry returned.
 
 Commands use the repository defaults when organization or project flags are omitted. Commands that support broader searches require the agent to select `--all-projects` explicitly.
 
@@ -60,8 +64,10 @@ Binary attachments and snapshot images are written only to an explicit output pa
 
 ## Read results and recover safely
 
-sentry-axi returns compact, structured output designed to reduce the tokens an AI agent needs to understand and act on Sentry data. Large text is previewed by default, selected fields can be requested with `--select`, and complete content can be requested with `--full`.
+sentry-axi returns compact output designed to reduce the tokens an AI agent needs to understand and act on Sentry data. Structured results are printed as TOON. Many Sentry answers, such as issue details and searches, are markdown; those are printed as markdown, with mentions of Sentry MCP tools rewritten to the matching `sentry-axi` command. List commands show each row's simple fields and name the nested fields they hide. When Sentry reports more rows or a next-page cursor, or a page fills the limit, the output says how to get the rest. Long text is previewed up to 6000 characters, selected fields can be requested with `--select`, and complete content can be requested with `--full`. A `--select` that would match nothing fails with the available fields instead of printing an empty result.
 
-Errors include practical recovery suggestions, such as authenticating, selecting a valid repository scope, correcting a command, or inspecting a resource.
+Every action documents its flags with `sentry-axi <group> <action> --help`.
+
+Errors include practical recovery suggestions, such as authenticating, selecting a valid repository scope, correcting a command, or inspecting a resource. Connection and server failures are summarized rather than echoing the raw response.
 
 Creating and updating Sentry data requires explicit user intent. If a mutation fails after it may have reached Sentry, the agent inspects the target before retrying rather than assuming the first attempt was rolled back.
