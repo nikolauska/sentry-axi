@@ -5,6 +5,7 @@ export type Renderable = string | Record<string, unknown>;
 
 export interface McpTool {
   name: string;
+  inputSchema?: { properties?: Record<string, { default?: unknown }> };
 }
 
 export interface McpContent {
@@ -33,10 +34,11 @@ export interface Runtime {
   cwd: string;
   env: NodeJS.ProcessEnv;
   stdout: Pick<Writable, "write">;
+  stderr?: Pick<Writable, "write">;
   client: McpClientLike;
   mcpUrl: string;
   binPath?: string;
-  toolNames?: Set<string>;
+  tools?: Map<string, McpTool>;
   signal?: AbortSignal;
 }
 
@@ -44,6 +46,7 @@ export interface MainContext {
   cwd: string;
   env: NodeJS.ProcessEnv;
   stdout: Pick<Writable, "write">;
+  stderr?: Pick<Writable, "write">;
   client?: McpClientLike;
   signal?: AbortSignal;
 }

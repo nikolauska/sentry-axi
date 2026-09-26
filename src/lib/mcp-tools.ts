@@ -1,21 +1,21 @@
 import { AxiError } from "axi-sdk-js";
-import type { InputRecord, McpResult, Runtime } from "../types.ts";
+import type { InputRecord, McpResult, McpTool, Runtime } from "../types.ts";
 
 export async function callSentryTool(
   runtime: Runtime,
   name: string,
   args: InputRecord,
 ): Promise<McpResult> {
-  const names = await availableToolNames(runtime);
-  if (names.has(name)) return runtime.client.callTool(name, args, runtime.signal);
-  if (names.has("execute_sentry_tool")) {
+  const tools = await availableTools(runtime);
+  if (tools.has(name)) return runtime.client.callTool(name, args, runtime.signal);
+  if (tools.has("execute_sentry_tool")) {
     return runtime.client.callTool(
       "execute_sentry_tool",
       { name, arguments: args },
       runtime.signal,
     );
   }
-  if (names.size === 0) return runtime.client.callTool(name, args, runtime.signal);
+  if (tools.size === 0) return runtime.client.callTool(name, args, runtime.signal);
   throw new AxiError(
     `Sentry MCP tool is unavailable in this session: ${name}`,
     "TOOL_UNAVAILABLE",
@@ -26,12 +26,21 @@ export async function callSentryTool(
   );
 }
 
-async function availableToolNames(runtime: Runtime): Promise<Set<string>> {
-  if (!runtime.toolNames) {
+// Schemas are kept so output shaping can read declared defaults such as the page limit.
+async function availableTools(runtime: Runtime): Promise<Map<string, McpTool>> {
+  if (!runtime.tools) {
     const tools = await runtime.client.listTools(runtime.signal);
-    runtime.toolNames = new Set(tools.map((tool) => tool.name));
+    runtime.tools = new Map(tools.map((tool) => [tool.name, tool]));
   }
-  return runtime.toolNames;
+  return runtime.tools;
+}
+
+// Current servers answer whoami with `{ user: { name, email } }` JSON; older ones with prose.
+export function describeIdentity(result: McpResult): string {
+  const user = (extractData(result) as { user?: { name?: unknown; email?: unknown } } | null)?.user;
+  if (typeof user?.name === "string")
+    return typeof user.email === "string" ? `${user.name} <${user.email}>` : user.name;
+  return extractText(result) ?? "authenticated";
 }
 
 export function extractData(result: McpResult): unknown {

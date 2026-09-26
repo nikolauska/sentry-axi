@@ -1,8 +1,12 @@
 import { createServer } from "node:http";
 
+import { AxiError } from "axi-sdk-js";
+
 import { parseFlags, usage } from "../args.ts";
-import { callSentryTool, extractText } from "../lib/mcp-tools.ts";
+import { callSentryTool, describeIdentity } from "../lib/mcp-tools.ts";
 import type { Renderable, Runtime } from "../types.ts";
+
+const AUTH_HINT = ["Run `sentry-axi auth --help`"];
 
 export async function authCommand(args: string[], runtime: Runtime): Promise<Renderable> {
   const [action, ...rest] = args;
@@ -11,7 +15,7 @@ export async function authCommand(args: string[], runtime: Runtime): Promise<Ren
   if (action === "finish") return finishCommand(rest, runtime);
   if (action === "logout") return logoutCommand(rest, runtime);
   if (action === "whoami") return whoamiCommand(rest, runtime);
-  throw usage(`unknown auth action: ${action}`, ["Run `sentry-axi auth --help`"]);
+  throw usage(`unknown auth action: ${action}`, AUTH_HINT);
 }
 
 export function authHelp() {
@@ -21,19 +25,22 @@ export function authHelp() {
     "  sentry-axi auth finish --code <code>",
     "  sentry-axi auth logout",
     "  sentry-axi auth whoami",
+    "",
+    "`auth login` waits up to --timeout ms (default 300000) for the browser callback.",
+    "Use `auth login --manual`, then `auth finish --code <code>`, when the shell cannot wait.",
   ].join("\n");
 }
 
 async function whoamiCommand(args: string[], runtime: Runtime): Promise<Renderable> {
-  const parsed = parseFlags(args, { boolean: ["help"] });
+  const parsed = parseFlags(args, { boolean: ["help"], suggestions: AUTH_HINT });
   if (parsed.help) return authHelp();
   if (parsed.positionals.length > 0)
-    throw usage("auth whoami does not accept positional arguments");
-  return { identity: extractText(await callSentryTool(runtime, "whoami", {})) };
+    throw usage("auth whoami does not accept positional arguments", AUTH_HINT);
+  return { identity: describeIdentity(await callSentryTool(runtime, "whoami", {})) };
 }
 
 async function loginCommand(args: string[], runtime: Runtime): Promise<Renderable> {
-  const parsed = parseFlags(args, { boolean: ["help", "manual"] });
+  const parsed = parseFlags(args, { boolean: ["help", "manual"], suggestions: AUTH_HINT });
   if (parsed.help) return authHelp();
   try {
     await runtime.client.listTools();
@@ -53,7 +60,7 @@ async function loginCommand(args: string[], runtime: Runtime): Promise<Renderabl
 }
 
 async function finishCommand(args: string[], runtime: Runtime): Promise<Renderable> {
-  const parsed = parseFlags(args, { boolean: ["help"] });
+  const parsed = parseFlags(args, { boolean: ["help"], suggestions: AUTH_HINT });
   if (parsed.help) return authHelp();
   if (!parsed.code)
     throw usage("--code is required", ["Run `sentry-axi auth finish --code <code>`"]);
@@ -63,7 +70,7 @@ async function finishCommand(args: string[], runtime: Runtime): Promise<Renderab
 }
 
 async function logoutCommand(args: string[], runtime: Runtime): Promise<Renderable> {
-  const parsed = parseFlags(args, { boolean: ["help"] });
+  const parsed = parseFlags(args, { boolean: ["help"], suggestions: AUTH_HINT });
   if (parsed.help) return authHelp();
   if (!runtime.client.logoutAuth) throw usage("the configured MCP client cannot clear OAuth");
   const result = await runtime.client.logoutAuth();
@@ -89,7 +96,9 @@ async function completeLoginWithCallback(
     ]);
   const server = await startOAuthCallbackServer(callbackUrl, timeoutMs, expectedState);
 
-  runtime.stdout?.write?.(
+  // The URL must be visible while this command blocks, but stdout is reserved for the single
+  // structured result, so the interim notice goes to stderr.
+  (runtime.stderr ?? process.stderr).write(
     [
       "auth: Sentry MCP OAuth authorization required",
       `url: ${JSON.stringify(authorizationUrl)}`,
@@ -140,15 +149,22 @@ async function startOAuthCallbackServer(
     const error = url.searchParams.get("error");
     const authCode = url.searchParams.get("code");
     if (url.searchParams.get("state") !== expectedState) {
+      // Keep waiting: a stale tab from an older login must not end the current one.
       response.writeHead(400, { "content-type": "text/plain" });
-      response.end("OAuth state did not match. You can close this tab.\n");
+      response.end(
+        "This sign-in page belongs to an older sentry-axi login. Open the newest URL printed by sentry-axi.\n",
+      );
       return;
     }
     if (error || !authCode) {
       response.writeHead(400, { "content-type": "text/plain" });
       response.end("Sentry authorization failed. You can close this tab.\n");
       finish(
-        new Error(error ? `Sentry OAuth error: ${error}` : "OAuth callback did not include a code"),
+        new AxiError(
+          error ? `Sentry OAuth error: ${error}` : "OAuth callback did not include a code",
+          "AUTH_ERROR",
+          ["Run `sentry-axi auth login` to start a new authorization"],
+        ),
         undefined,
       );
       return;
@@ -167,11 +183,25 @@ async function startOAuthCallbackServer(
   }
 
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
+    server.once("error", (error: NodeJS.ErrnoException) =>
+      reject(
+        new AxiError(
+          `Could not listen for the OAuth callback on ${callbackUrl.host}${error.code ? ` (${error.code})` : ""}`,
+          "AUTH_ERROR",
+          ["Run `sentry-axi auth login --manual`"],
+        ),
+      ),
+    );
     server.listen(Number(callbackUrl.port), callbackUrl.hostname, () => resolve());
   });
   timeout = setTimeout(
-    () => finish(new Error("Timed out waiting for Sentry OAuth callback"), undefined),
+    () =>
+      finish(
+        new AxiError("Timed out waiting for Sentry OAuth callback", "AUTH_TIMEOUT", [
+          "Run `sentry-axi auth login` again, or `sentry-axi auth login --manual` if the browser cannot reach the callback",
+        ]),
+        undefined,
+      ),
     timeoutMs,
   );
   return { code, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };

@@ -5,6 +5,7 @@ main(process.argv.slice(2), {
   cwd: process.cwd(),
   env: process.env,
   stdout: process.stdout,
+  stderr: process.stderr,
 }).catch((error) => {
   const message = error && typeof error.message === "string" ? error.message : String(error);
   process.stdout.write(`error: ${message}\n`);
