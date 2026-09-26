@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { CATALOG, MAPPED_TOOL_NAMES } from "../src/catalog.ts";
+import { main } from "../src/cli.ts";
 import { catalogCommand } from "../src/commands/catalog.ts";
 import type { InputRecord, McpResult, Runtime } from "../src/types.ts";
 
@@ -72,7 +73,7 @@ test("routes catalog-only tools through execute_sentry_tool", async () => {
     ["view", "1.2.3", "--include-commits=false", "--limit", "5"],
     runtime,
   );
-  assert.equal((output as Record<string, unknown>).result, "ok");
+  assert.equal(output, "ok");
   assert.deepEqual(calls[0], [
     "execute_sentry_tool",
     {
@@ -127,6 +128,62 @@ test("rejects invalid enums and missing required arguments before MCP calls", as
     /must be one of/,
   );
   await assert.rejects(() => catalogCommand("docs")(["view"], runtime), /--path is required/);
+});
+
+test("action help lists the action's flags through the CLI entry point", async () => {
+  const cwd = await repository();
+  let stdout = "";
+  try {
+    await main(["issues", "search", "--help"], {
+      cwd,
+      env: {},
+      stdout: { write: (chunk: string) => (stdout += chunk) },
+      client: fakeRuntime(cwd, [], []).client,
+    });
+  } finally {
+    await rm(cwd, { recursive: true });
+  }
+  assert.match(stdout, /sentry-axi issues search \[<query>\] \[flags\]/);
+  assert.match(stdout, /--organization <value> +required; defaults to \.sentry-project/);
+  assert.match(stdout, /--sort <date\|freq\|new\|user>/);
+  assert.match(stdout, /--all-projects/);
+});
+
+test("missing scope points at repository binding instead of generic help", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "sentry-axi-catalog-"));
+  try {
+    await assert.rejects(
+      () => catalogCommand("issues")(["search"], fakeRuntime(cwd, [], ["search_issues"])),
+      (error: Error & { suggestions: string[] }) => {
+        assert.match(error.message, /--organization is required/);
+        assert.deepEqual(error.suggestions, [
+          "Run `sentry-axi init --organization <slug> --project <slug>` to save defaults",
+          "Run `sentry-axi organizations list`",
+        ]);
+        return true;
+      },
+    );
+  } finally {
+    await rm(cwd, { recursive: true });
+  }
+});
+
+test("suggests a copy-pasteable command for the next page", async () => {
+  const cwd = await repository();
+  const runtime = fakeRuntime(cwd, [], ["find_dashboards"], {
+    structuredContent: { dashboards: [{ id: "1", title: "Ops" }], nextCursor: "0:25:0" },
+  });
+  try {
+    const output = (await catalogCommand("dashboards")(
+      ["list", "--title-query", "on call", "--cursor", "old"],
+      runtime,
+    )) as Record<string, unknown>;
+    assert.deepEqual(output.help, [
+      "Run `sentry-axi dashboards list --title-query 'on call' --cursor 0:25:0` for the next page",
+    ]);
+  } finally {
+    await rm(cwd, { recursive: true });
+  }
 });
 
 test("resolves binary output paths against the runtime directory", async () => {
