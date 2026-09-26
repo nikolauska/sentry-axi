@@ -2,8 +2,8 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { usage } from "./args.ts";
-import { callSentryTool, extractText } from "./lib/mcp-tools.ts";
-import type { Runtime } from "./types.ts";
+import { callSentryTool, extractData, extractText } from "./lib/mcp-tools.ts";
+import type { McpResult, Runtime } from "./types.ts";
 
 export interface RepoBinding {
   organization: string;
@@ -92,15 +92,16 @@ export async function validateBinding(
   let project = constrained.project ?? requested.project;
   let regionUrl = requested.regionUrl;
 
+  // Discovery queries are fuzzy; only an exact slug match may be saved, otherwise a single
+  // near-miss result would silently bind the repository to a different project.
   if (!constrained.organization) {
-    const text =
-      extractText(await callSentryTool(runtime, "find_organizations", { query: organization })) ??
-      "";
-    const organizations = parseOrganizations(text);
-    const match =
-      organizations.find((item) => same(item.slug, organization)) ?? single(organizations);
+    const organizations = parseOrganizations(
+      await callSentryTool(runtime, "find_organizations", { query: organization }),
+    );
+    const match = organizations.find((item) => same(item.slug, organization));
     if (!match)
       throw usage(`Sentry organization not found: ${organization}`, [
+        ...closeMatches(organizations.map((item) => item.slug)),
         "Run `sentry-axi organizations list`",
       ]);
     organization = match.slug;
@@ -108,18 +109,17 @@ export async function validateBinding(
   }
 
   if (!constrained.project) {
-    const text =
-      extractText(
-        await callSentryTool(runtime, "find_projects", {
-          organizationSlug: organization,
-          ...(regionUrl ? { regionUrl } : {}),
-          query: project,
-        }),
-      ) ?? "";
-    const projects = parseProjectSlugs(text);
-    const matchedProject = projects.find((slug) => same(slug, project)) ?? single(projects);
+    const projects = parseProjectSlugs(
+      await callSentryTool(runtime, "find_projects", {
+        organizationSlug: organization,
+        ...(regionUrl ? { regionUrl } : {}),
+        query: project,
+      }),
+    );
+    const matchedProject = projects.find((slug) => same(slug, project));
     if (!matchedProject)
       throw usage(`Sentry project not found: ${requested.project}`, [
+        ...closeMatches(projects),
         `Run \`sentry-axi projects list --organization ${organization}\``,
       ]);
     project = matchedProject;
@@ -128,7 +128,24 @@ export async function validateBinding(
   return { organization, project, ...(regionUrl ? { regionUrl } : {}) };
 }
 
-export function parseOrganizations(text: string): Array<{ slug: string; regionUrl?: string }> {
+// Current Sentry MCP servers return structured `{ organizations: [...] }`; older ones only markdown.
+export function parseOrganizations(result: McpResult): Array<{ slug: string; regionUrl?: string }> {
+  const data = extractData(result) as { organizations?: unknown };
+  if (Array.isArray(data?.organizations)) {
+    return data.organizations.flatMap((item: { slug?: unknown; regionUrl?: unknown }) =>
+      typeof item?.slug === "string"
+        ? [
+            {
+              slug: item.slug,
+              ...(typeof item.regionUrl === "string" && item.regionUrl
+                ? { regionUrl: item.regionUrl }
+                : {}),
+            },
+          ]
+        : [],
+    );
+  }
+  const text = extractText(result) ?? "";
   const matches = [
     ...text.matchAll(/^## \*\*([^*]+)\*\*\s*$[\s\S]*?^\*\*Region URL:\*\*\s*(.*)$/gm),
   ];
@@ -138,7 +155,14 @@ export function parseOrganizations(text: string): Array<{ slug: string; regionUr
   }));
 }
 
-export function parseProjectSlugs(text: string): string[] {
+export function parseProjectSlugs(result: McpResult): string[] {
+  const data = extractData(result) as { projects?: unknown };
+  if (Array.isArray(data?.projects)) {
+    return data.projects.flatMap((item: { slug?: unknown }) =>
+      typeof item?.slug === "string" ? [item.slug] : [],
+    );
+  }
+  const text = extractText(result) ?? "";
   return [...text.matchAll(/^- \*\*([^*]+)\*\*\s*$/gm)].map((match) => match[1].trim());
 }
 
@@ -152,6 +176,6 @@ function same(left: string, right: string): boolean {
   return String(left).toLowerCase() === String(right).toLowerCase();
 }
 
-function single<T>(values: T[]): T | null {
-  return values.length === 1 ? values[0] : null;
+function closeMatches(slugs: string[]): string[] {
+  return slugs.length > 0 ? [`Similar slugs: ${slugs.slice(0, 5).join(", ")}`] : [];
 }

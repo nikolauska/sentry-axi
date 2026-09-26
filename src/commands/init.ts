@@ -8,7 +8,10 @@ export async function initCommand(
   args: string[],
   runtime: Runtime,
 ): Promise<Record<string, unknown> | string> {
-  const parsed = parseFlags(args, { boolean: ["help", "force"] });
+  const parsed = parseFlags(args, {
+    boolean: ["help", "force"],
+    suggestions: ["Run `sentry-axi init --help`"],
+  });
   if (parsed.help) return initHelp();
   const organization = String(parsed.organization ?? "").trim();
   const project = String(parsed.project ?? "").trim();
@@ -44,6 +47,8 @@ export async function initCommand(
 export function initHelp() {
   return [
     "Usage:",
-    "  sentry-axi init --organization <slug> --project <slug-or-id> [--region-url <url>] [--force]",
+    "  sentry-axi init --organization <slug> --project <slug> [--region-url <url>] [--force]",
+    "",
+    "Both slugs must match exactly; run `sentry-axi organizations list` or `sentry-axi projects list` to find them.",
   ].join("\n");
 }

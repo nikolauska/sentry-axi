@@ -20,12 +20,58 @@ test("parses hosted endpoint constraints", () => {
   assert.deepEqual(endpointConstraints("https://mcp.sentry.dev/mcp"), {});
 });
 
-test("parses organization and project discovery output", () => {
+test("parses structured and markdown organization and project discovery output", () => {
+  const text = (value: string) => ({ content: [{ type: "text", text: value }] });
   assert.deepEqual(
-    parseOrganizations("## **acme**\n\n**Web URL:** x\n**Region URL:** https://us.sentry.io"),
+    parseOrganizations(text("## **acme**\n\n**Web URL:** x\n**Region URL:** https://us.sentry.io")),
     [{ slug: "acme", regionUrl: "https://us.sentry.io" }],
   );
-  assert.deepEqual(parseProjectSlugs("- **web**\n- **worker**\n"), ["web", "worker"]);
+  assert.deepEqual(parseProjectSlugs(text("- **web**\n- **worker**\n")), ["web", "worker"]);
+  assert.deepEqual(
+    parseOrganizations({
+      structuredContent: {
+        organizations: [{ slug: "acme", webUrl: null, regionUrl: "https://us.sentry.io" }],
+        hasMore: false,
+      },
+    }),
+    [{ slug: "acme", regionUrl: "https://us.sentry.io" }],
+  );
+  assert.deepEqual(
+    parseProjectSlugs({ structuredContent: { projects: [{ slug: "web" }], hasMore: false } }),
+    ["web"],
+  );
+});
+
+test("refuses to bind a project that only fuzzily matches the request", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "sentry-axi-repo-"));
+  await mkdir(join(cwd, ".git"));
+  const runtime = {
+    cwd,
+    mcpUrl: "https://mcp.sentry.dev/mcp",
+    client: {
+      listTools: async () => [{ name: "find_organizations" }, { name: "find_projects" }],
+      callTool: async (name) => ({
+        content: [
+          {
+            type: "text",
+            text:
+              name === "find_organizations"
+                ? "## **acme**\n\n**Region URL:** https://us.sentry.io"
+                : "- **web-legacy**\n",
+          },
+        ],
+      }),
+    },
+  };
+  await assert.rejects(
+    () => initCommand(["--organization", "acme", "--project", "web"], runtime),
+    (error) => {
+      assert.match(error.message, /Sentry project not found: web/);
+      assert.ok(error.suggestions.includes("Similar slugs: web-legacy"));
+      return true;
+    },
+  );
+  assert.equal(await readRepoBinding(cwd), null);
 });
 
 test("initializes a canonical repository binding", async () => {
