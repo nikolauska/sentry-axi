@@ -55,7 +55,7 @@ export async function main(args: string[], context: MainContext): Promise<void> 
     // Catalog groups are deliberately absent: the SDK calls this for any `--help` after the
     // command name, and returning group help here would hide `<group> <action> --help`.
     getCommandHelp: (command) =>
-      (({ auth: authHelp, init: initHelp, setup: setupHelp }) as Record<string, () => string>)[
+      ({ auth: authHelp, init: initHelp, setup: setupHelp } as Record<string, () => string>)[
         command
       ]?.(),
     renderUnknownCommand: (command) =>
